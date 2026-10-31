@@ -37,11 +37,14 @@ const fmt=n=>Math.round(n).toLocaleString('ja-JP')+'円';
 const ym=m=>m.slice(0,4)+'年'+(+m.slice(5))+'月';
 const btn=(l,a,v,c)=>`<button class="b ${c||''}" data-a="${a}"${v!=null?` data-v="${esc(v)}"`:''}>${l}</button>`;
 const back=(r)=>btn('もどる','go',r||'home');
-let S=null,V={r:'home',buf:'',day:0,memo:'',nm:'',kind:'f',scope:'a'};
+let S=null,V={au:'wait',r:'home',buf:'',day:0,memo:'',nm:'',kind:'f',scope:'a'};
 try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 if(!S||!Array.isArray(S.tx)){S={ok:0,step:0,inc:[],fix:[],sel:[],save:0,tx:[],bk:0,cr:Date.now()}}
 if(!S.ok)V.r='setup';
-function save(){try{localStorage.setItem(K,JSON.stringify(S));V.err=0}catch(e){V.err=1}}
+function save(){S.upd=Date.now();try{localStorage.setItem(K,JSON.stringify(S));V.err=0}catch(e){V.err=1}if(window.FB)FB.push()}
+window.kkGet=()=>S;
+window.kkSet=c=>{S=c;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}if(!S.ok)V.r='setup';else if(V.r=='setup')V.r='home'};
+window.kkReset=()=>{try{localStorage.removeItem(K)}catch(e){}S={ok:0,step:0,inc:[],fix:[],sel:[],save:0,tx:[],bk:0,cr:Date.now()};V.r='setup'};
 function calc(m){const inc=S.inc.reduce((a,i)=>a+i.a,0);let fx=0;
 S.fix.forEach(f=>{const v=f.ov&&f.ov[m]!=null?f.ov[m]:f.a;fx+=f.y?v/12:v});
 const t=S.tx.filter(x=>x.d.slice(0,7)==m),all=t.reduce((a,x)=>a+x.a,0),sp=t.filter(x=>x.c!=5).reduce((a,x)=>a+x.a,0);
@@ -67,8 +70,11 @@ return bn+u+`<p class="c" style="margin:6px">今月 あと使えるお金</p><di
 <p class="c">1日あたり 約 <b>${fmt(pd)}</b></p>${btn('＋ 入力する','new','','p')}
 <p class="c mu">特別な出費 今月 ${fmt(c.sx)}(警告には入りません)</p>
 <div class="g3">${btn('入力一覧','lst')}${btn('履歴','go','hist')}${btn('設定','go','set')}</div>
-${old?'<p class="c mu">30日以上バックアップをしていません。設定からできます。</p>':''}${V.err?'<p class="c" style="color:var(--er)">このスマホでは保存できません</p>':''}
+${V.err?'<p class="c" style="color:var(--er)">このスマホでは保存できません</p>':''}${V.cl===0?'<p class="c" style="color:var(--er)">クラウドに保存できていません。インターネットを確認してください。</p>':''}
 <hr><h1>お金の行き先</h1><p class="mu">月収入を100%とした場合</p>${pie1(c)}<hr><h1>使ったお金の内訳</h1><p class="mu">使った額を100%とした場合</p>${pie2(c)}`},
+login(){const ln=/Line\//.test(navigator.userAgent);
+if(V.au=='wait')return `<h1>家計簿</h1><p>読み込み中です…</p>${V.slow?'<p class="mu">時間がかかっています。インターネットにつながっているか確認してください。</p>'+btn('もう一度読み込む','rl','','p'):''}`;
+return `<h1>家計簿</h1><p>Googleアカウントでログインしてください。</p>${ln?'<p style="color:var(--er)"><b>LINEの中ではログインできません。右上のメニューから「Safariで開く」または「ブラウザで開く」を選んでください。</b></p>':''}${btn('Googleでログイン','glogin','','p')}${V.msg?`<p style="color:var(--er)"><b>${V.msg}</b></p>`:''}<p class="mu">家計のデータは、ログインした人だけが見られます。</p>`},
 cat(){return `<h1>何に使いましたか?</h1><div class="g2">${C.map((c,i)=>`<button class="b ${V.cat===i?'sel':''}" data-a="pc" data-v="${i}">${c}<br><small class="mu">${D[i]}</small></button>`).join('')}</div>
 ${V.edit||V.dd?'':`<p class="c mu">日付:${V.day?'きのう':'今日'}</p>${btn(V.day?'今日の分にする':'きのうの分にする','day')}`}${back(V.edit?'det':'home')}`},
 amt(){return `<h1>${C[V.cat]} にいくら?</h1>${disp()}<div class="g3">${[500,1000,2000].map(n=>btn(n,'q',n)).join('')}</div>${kp()}
@@ -89,7 +95,7 @@ hist(){const cm=mk(new Date()),ms=[...new Set([cm,...S.tx.map(x=>x.d.slice(0,7))
 return `<h1>毎月のようす</h1>${ms.map(m=>{const c=calc(m);return btn(`${ym(m)}${m==cm?'(今月)':''}<br><small>${c.rem>=0?(m==cm?'あと ':'余り ')+fmt(c.rem):'超過 '+fmt(-c.rem)}</small>`,'hd',m,c.rem<0?'d':'')}).join('')}
 <div class="card row"><span>特別な出費の累計</span><b>${fmt(sx())}</b></div><p class="mu">余りや超過は、次の月に持ち越しません。</p>${back()}`},
 hd(){const c=calc(V.hm);return `<h1>${ym(V.hm)}のようす</h1><div class="card"><div class="row"><span>使えたお金</span><b>${fmt(c.fr)}</b></div><div class="row"><span>使った額</span><b>${fmt(c.sp)}</b></div><div class="row"><span>${c.rem>=0?'余り':'超過'}</span><b>${fmt(Math.abs(c.rem))}</b></div><div class="row"><span>特別な出費</span><b>${fmt(c.sx)}</b></div></div><h1>使ったお金の内訳</h1>${pie2(c)}${btn('入力一覧を見る','lst2','','p')}${back('hist')}`},
-set(){return `<h1>設定</h1>${btn('収入を直す','go','si')}${btn('毎月の支払いを直す','go','sf')}${btn('貯金の目標を直す','gss')}<hr>${btn('バックアップ','go','bk')}${btn('復元','go','rs')}${back()}`},
+set(){return `<h1>設定</h1>${btn('収入を直す','go','si')}${btn('毎月の支払いを直す','go','sf')}${btn('貯金の目標を直す','gss')}<hr>${btn('バックアップ','go','bk')}${btn('復元','go','rs')}<hr>${btn('ログアウト','glogout','','d')}${back()}`},
 si(){return `<h1>収入</h1>${S.inc.map((i,k)=>btn(`<span class="row"><span>${esc(i.n)}</span><span>${fmt(i.a)}</span></span>`,'ie',k)).join('')}${btn('＋ 収入を足す','ie','new','p')}${back('set')}`},
 iedit(){return `<h1>収入</h1><input data-i="nm" placeholder="名前(例:年金)" value="${esc(V.nm)}"><p class="mu">手取りの金額</p>${disp()}${kp()}${btn('保存する','isave','','p')}${V.ii!=='new'?btn('この収入を消す','idel','','d'):''}${back('si')}`},
 ss(){return `<h1>毎月の貯金の目標</h1><p class="mu">0円でもかまいません</p>${disp()}${kp()}${btn('保存する','svs','','p')}${back('set')}`},
@@ -114,7 +120,7 @@ return h(4,`${esc(n)}の金額`)+(v?'<p class="mu">毎月変わるお金は、�
 if(st==4)return h(5,'毎月の貯金の目標は?')+`<p class="mu">0円でもかまいません</p>${disp()}${kp()}${btn('次へ','svx','','p')}${sb}`;
 return h(6,'これで良いですか?')+`<div class="card">${S.inc.map(i=>`<div class="row"><span>${esc(i.n)}</span><b>${fmt(i.a)}</b></div>`).join('')}<hr style="margin:8px 0">${S.fix.map(f=>`<div class="row"><span>${esc(f.n)}</span><b>${fmt(f.a)}${f.y?'/年':''}</b></div>`).join('')}<hr style="margin:8px 0"><div class="row"><span>貯金</span><b>${fmt(S.save)}</b></div></div><p class="mu">あとから設定で直せます</p>${btn('はじめる','fin2','','p')}${sb}`}
 };
-const R=()=>{document.getElementById('app').innerHTML=P[V.r]()};
+const R=()=>{document.getElementById('app').innerHTML=(V.au=='in'?P[V.r]:P.login)()};
 const go=r=>{V.r=r;V.msg='';R();window.scrollTo(0,0)};
 const to=s=>{S.step=s;save();R();window.scrollTo(0,0)};
 function undoTimer(){setTimeout(()=>{if(V.r=='home'||V.r=='done')R()},8100)}
@@ -122,6 +128,9 @@ async function cp(t){try{await navigator.clipboard.writeText(t);return 1}catch(e
 function A(a,v){const cm=mk(new Date());
 switch(a){
 case 'go':return go(v);
+case 'rl':location.reload();return;
+case 'glogin':if(window.FB)FB.login();else{V.msg='まだ準備中です。少し待ってから、もう一度押してください。';R()}return;
+case 'glogout':if(confirm('ログアウトしますか?')&&window.FB)FB.logout();return;
 case 'new':V.edit=null;V.buf='';V.memo='';V.day=0;V.cat=-1;V.dd=null;return go('cat');
 case 'dy':V.dd=v;V.m=v.slice(0,7);return go('dy');
 case 'nd':V.edit=null;V.buf='';V.memo='';V.cat=-1;return go('cat');
@@ -179,4 +188,24 @@ case 'fin2':S.ok=1;S.step=0;save();return go('home');
 document.getElementById('app').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A(b.dataset.a,b.dataset.v)});
 document.getElementById('app').addEventListener('input',e=>{const i=e.target.dataset.i;if(i)V[i]=e.target.value});
 R();
+setTimeout(()=>{if(V.au=='wait'){V.slow=1;R()}},8000);
+</script>
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import{getAuth,onAuthStateChanged,signInWithPopup,GoogleAuthProvider,signOut}from"https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyDL0DRB0-ornjbGJgFR6dJTyvneFQjdAQk",authDomain:"kakeibo-e5693.firebaseapp.com",projectId:"kakeibo-e5693",storageBucket:"kakeibo-e5693.firebasestorage.app",messagingSenderId:"466161282764",appId:"1:466161282764:web:f98178383adc1c572cdc69"});
+const auth=getAuth(app),db=getFirestore(app),dr=()=>doc(db,'users',auth.currentUser.uid,'data','main');
+let tm=0;
+function push(){clearTimeout(tm);tm=setTimeout(async()=>{if(!auth.currentUser)return;try{const L=kkGet();await setDoc(dr(),{json:JSON.stringify(L),upd:L.upd||Date.now()});V.cl=1}catch(e){V.cl=0}if(V.au=='in'&&V.r=='home')R()},1500)}
+async function pull(first){if(!auth.currentUser)return;try{const r=await getDoc(dr()),L=kkGet();
+if(r.exists()){const c=JSON.parse(r.data().json);
+if(!L.ok||(c.upd||0)>(L.upd||0)){if(first||V.r=='home')kkSet(c)}else if((L.upd||0)>(c.upd||0))push()}
+else if(L.ok)push();V.cl=1}catch(e){V.cl=0}}
+window.FB={push,
+login:async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){V.msg=(e.code=='auth/popup-closed-by-user'||e.code=='auth/cancelled-popup-request')?'ログインが完了しませんでした。もう一度押してください。':'ログインできませんでした。ポップアップを許可して、もう一度お試しください。';R()}},
+logout:async()=>{await signOut(auth);kkReset();V.au='out';R()}};
+onAuthStateChanged(auth,async u=>{if(u){await pull(1);V.au='in'}else V.au='out';R()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible'&&V.au=='in')pull().then(()=>{if(V.r=='home')R()})});
 </script></body></html>
+
