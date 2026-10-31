@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>家計簿</title>
+<style>
+:root{--bg:#F4F7FA;--sf:#fff;--tx:#12203A;--mu:#46536A;--ln:#B6C1D1;--pr:#1D4E89;--pt:#fff;--ok:#14733F;--okb:#DDF3E6;--wn:#FFD23F;--wt:#3A2E00;--er:#C62828;--et:#fff;--c1:#1D4E89;--c2:#14733F;--c3:#C62828;--c4:#E08A00;--c5:#7B5BB5;--c6:#5A6B7B;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0D1524;--sf:#18233A;--tx:#EEF2F8;--mu:#B4BFD1;--ln:#42506B;--pr:#8DB8F2;--pt:#0D1524;--ok:#7BDDA2;--okb:#14382A;--er:#FF8A80;--et:#2A0A08;--c1:#8DB8F2;--c2:#7BDDA2;--c3:#FF8A80;--c4:#FFB84D;--c5:#BFA6F0;--c6:#A8B6C6}}
+:root[data-theme="dark"]{--bg:#0D1524;--sf:#18233A;--tx:#EEF2F8;--mu:#B4BFD1;--ln:#42506B;--pr:#8DB8F2;--pt:#0D1524;--ok:#7BDDA2;--okb:#14382A;--er:#FF8A80;--et:#2A0A08;--c1:#8DB8F2;--c2:#7BDDA2;--c3:#FF8A80;--c4:#FFB84D;--c5:#BFA6F0;--c6:#A8B6C6}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:24px/1.5 "BIZ UDPGothic","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif}
+#app{max-width:520px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:30px;margin:8px 0 14px;line-height:1.3}
+.b{display:block;width:100%;min-height:68px;font:inherit;font-weight:700;border:3px solid var(--pr);background:var(--sf);color:var(--pr);border-radius:14px;margin:10px 0;padding:10px}
+.b.p{background:var(--pr);color:var(--pt)}.b.d{border-color:var(--er);color:var(--er)}.b.sel{background:var(--pr);color:var(--pt)}
+.g2,.g3{display:grid;gap:10px;margin:10px 0}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+.g2 .b,.g3 .b{margin:0}
+.bn{border-radius:18px;padding:20px 18px;font-weight:800;font-size:34px;margin-bottom:14px;line-height:1.3}
+.bn small{display:block;font-size:24px;font-weight:600}
+.bn.ok{background:var(--okb);color:var(--ok)}.bn.w{background:var(--wn);color:var(--wt)}.bn.e{background:var(--er);color:var(--et)}
+.big{font-size:56px;font-weight:800;text-align:center;line-height:1.2}
+.c{text-align:center}.mu{color:var(--mu);font-size:20px}.sel .mu{color:inherit}
+.card{background:var(--sf);border:2px solid var(--ln);border-radius:14px;padding:12px 16px;margin:12px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+input,textarea{font:inherit;width:100%;box-sizing:border-box;padding:12px;border:3px solid var(--ln);border-radius:12px;background:var(--sf);color:var(--tx)}
+.disp{font-size:44px;font-weight:800;text-align:right;border:3px solid var(--ln);border-radius:12px;padding:8px 14px;background:var(--sf);margin:10px 0}
+.sw{display:inline-block;width:20px;height:20px;border-radius:5px;margin-right:8px;vertical-align:-3px}
+hr{border:0;border-top:3px solid var(--ln);margin:22px 0}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:10px 0}.cal{font:inherit;font-weight:700;min-height:62px;border:2px solid var(--ln);border-radius:10px;background:var(--sf);color:var(--tx);padding:2px}.cal small{display:block;font-size:14px;color:var(--pr);line-height:1}.cal.has{background:var(--okb)}.cal.td{border:4px solid var(--pr)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:4px solid var(--wn);outline-offset:2px}
+</style></head><body><div id="app"></div>
+<script>
+const C=['食費','日用品','医療','楽しみ','その他','特別な出費'],D=['毎日の食べ物','洗剤・紙など','病院・薬','趣味・お出かけ','ほかのもの','警告に入りません'];
+const FX=['家賃','電気','ガス','水道','通信費','保険','税金','その他'],VAR=['電気','ガス','水道'],YR=['保険','税金'],K='kk1';
+const p=n=>String(n).padStart(2,'0'),ds=d=>d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),mk=d=>ds(d).slice(0,7);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>Math.round(n).toLocaleString('ja-JP')+'円';
+const ym=m=>m.slice(0,4)+'年'+(+m.slice(5))+'月';
+const btn=(l,a,v,c)=>`<button class="b ${c||''}" data-a="${a}"${v!=null?` data-v="${esc(v)}"`:''}>${l}</button>`;
+const back=(r)=>btn('もどる','go',r||'home');
+let S=null,V={r:'home',buf:'',day:0,memo:'',nm:'',kind:'f',scope:'a'};
+try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
+if(!S||!Array.isArray(S.tx)){S={ok:0,step:0,inc:[],fix:[],sel:[],save:0,tx:[],bk:0,cr:Date.now()}}
+if(!S.ok)V.r='setup';
+function save(){try{localStorage.setItem(K,JSON.stringify(S));V.err=0}catch(e){V.err=1}}
+function calc(m){const inc=S.inc.reduce((a,i)=>a+i.a,0);let fx=0;
+S.fix.forEach(f=>{const v=f.ov&&f.ov[m]!=null?f.ov[m]:f.a;fx+=f.y?v/12:v});
+const t=S.tx.filter(x=>x.d.slice(0,7)==m),all=t.reduce((a,x)=>a+x.a,0),sp=t.filter(x=>x.c!=5).reduce((a,x)=>a+x.a,0);
+const fr=inc-fx-S.save,rem=fr-sp,r=fr>0?sp/fr:1;
+return{inc,fx,fr,sp,sx:all-sp,all,rem,st:r>=1?2:r>=.8?1:0,t}}
+function pie(items){const T=items.reduce((a,i)=>a+i[1],0);if(!T)return '<p class="c mu">まだありません</p>';
+let o=25,s='<circle r="15.9" cx="20" cy="20" fill="none" stroke="var(--ln)" stroke-width="8"/>';
+items.forEach((i,k)=>{const q=i[1]/T*100;s+=`<circle r="15.9" cx="20" cy="20" fill="none" stroke="var(--c${k+1})" stroke-width="8" stroke-dasharray="${q} ${100-q}" stroke-dashoffset="${o}"/>`;o-=q});
+return `<svg viewBox="0 0 40 40" width="220" height="220" style="display:block;margin:0 auto" role="img" aria-label="円グラフ">${s}</svg>`+
+items.map((i,k)=>`<div class="row"><span><span class="sw" style="background:var(--c${k+1})"></span>${i[0]}</span><span>${Math.round(i[1]/T*100)}% ${fmt(i[1])}</span></div>`).join('')}
+const pie1=c=>pie([['固定費',c.fx],['貯金目標',S.save],['使った額',c.all],['残り',Math.max(0,c.inc-c.fx-S.save-c.all)]]);
+const pie2=c=>pie(C.map((n,i)=>[n,c.t.filter(x=>x.c==i).reduce((a,x)=>a+x.a,0)]));
+const kp=()=>'<div class="g3">'+[7,8,9,4,5,6,1,2,3,0,'00','消す'].map(k=>btn(k,'k',k)).join('')+'</div>';
+const disp=()=>`<div class="disp">${V.buf?fmt(V.buf):'0円'}</div>`;
+const undoOn=()=>V.undo&&Date.now()<V.undo.t&&S.tx.some(x=>x.id==V.undo.id);
+const sx=(m)=>S.tx.filter(x=>x.c==5).reduce((a,x)=>a+x.a,0);
+const P={
+home(){const m=mk(new Date()),c=calc(m),n=new Date(),left=new Date(n.getFullYear(),n.getMonth()+1,0).getDate()-n.getDate()+1;
+const pd=c.rem>0?c.rem/left:0,old=Date.now()-(S.bk||S.cr)>30*864e5;
+const bn=['<div class="bn ok">順調です<small>いまのところ使いすぎていません</small></div>','<div class="bn w">⚠ 注意<small>使いすぎに近づいています</small></div>','<div class="bn e">⚠ 警告<small>今月は使いすぎです</small></div>'][c.st];
+let u='';if(undoOn()){const x=S.tx.find(t=>t.id==V.undo.id);u=`<div class="card row"><span>${C[x.c]} ${fmt(x.a)}を入力</span><span style="flex:0 0 150px">${btn('取り消す','undo','','d')}</span></div>`}
+return bn+u+`<p class="c" style="margin:6px">今月 あと使えるお金</p><div class="big">${c.rem>=0?fmt(c.rem):'−'+fmt(-c.rem)}</div>${c.rem<0?'<p class="c">使えるお金を超えています</p>':''}
+<p class="c">1日あたり 約 <b>${fmt(pd)}</b></p>${btn('＋ 入力する','new','','p')}
+<p class="c mu">特別な出費 今月 ${fmt(c.sx)}(警告には入りません)</p>
+<div class="g3">${btn('入力一覧','lst')}${btn('履歴','go','hist')}${btn('設定','go','set')}</div>
+${old?'<p class="c mu">30日以上バックアップをしていません。設定からできます。</p>':''}${V.err?'<p class="c" style="color:var(--er)">このスマホでは保存できません</p>':''}
+<hr><h1>お金の行き先</h1><p class="mu">月収入を100%とした場合</p>${pie1(c)}<hr><h1>使ったお金の内訳</h1><p class="mu">使った額を100%とした場合</p>${pie2(c)}`},
+cat(){return `<h1>何に使いましたか?</h1><div class="g2">${C.map((c,i)=>`<button class="b ${V.cat===i?'sel':''}" data-a="pc" data-v="${i}">${c}<br><small class="mu">${D[i]}</small></button>`).join('')}</div>
+${V.edit||V.dd?'':`<p class="c mu">日付:${V.day?'きのう':'今日'}</p>${btn(V.day?'今日の分にする':'きのうの分にする','day')}`}${back(V.edit?'det':'home')}`},
+amt(){return `<h1>${C[V.cat]} にいくら?</h1>${disp()}<div class="g3">${[500,1000,2000].map(n=>btn(n,'q',n)).join('')}</div>${kp()}
+<input data-i="memo" placeholder="メモ(なくてもよい)" value="${esc(V.memo||'')}" style="margin:10px 0"><div class="g2">${back('cat')}${btn(V.edit?'保存する':'入力する','add','','p')}</div>`},
+done(){const x=S.tx.find(t=>t.id==V.last);if(!x)return P.home();
+return `<h1>入力しました</h1><div class="card row"><b>${C[x.c]}</b><b>${fmt(x.a)}</b></div>${undoOn()?btn('取り消す','undo','','d'):''}${btn('つづけて入力する','more','','p')}${btn('おわり','fin')}`},
+list(){const y=+V.m.slice(0,4),mo=+V.m.slice(5),f=new Date(y,mo-1,1).getDay(),n=new Date(y,mo,0).getDate(),tot={},td=ds(new Date());let g='';
+S.tx.forEach(x=>{if(x.d.slice(0,7)==V.m)tot[x.d]=(tot[x.d]||0)+x.a});
+'日月火水木金土'.split('').forEach(w=>g+=`<div class="c mu">${w}</div>`);for(let i=0;i<f;i++)g+='<div></div>';
+for(let d=1;d<=n;d++){const k=V.m+'-'+p(d);g+=`<button class="cal${tot[k]?' has':''}${k==td?' td':''}" data-a="dy" data-v="${k}">${d}${tot[k]?'<small>●</small>':''}</button>`}
+return `<div class="row"><div style="flex:0 0 90px">${btn('◀','mo',-1)}</div><h1 style="margin:0">${ym(V.m)}</h1><div style="flex:0 0 90px">${btn('▶','mo',1)}</div></div><p class="c mu">日付を押すと、その日の入力を見られます。●は入力のある日です。</p><div class="cg">${g}</div><div class="card row"><span>この月の合計</span><b>${fmt(Object.values(tot).reduce((a,b)=>a+b,0))}</b></div>${back()}`},
+dy(){const k=V.dd,t=S.tx.filter(x=>x.d==k),[y,m,d]=k.split('-').map(Number),w='日月火水木金土'[new Date(y,m-1,d).getDay()];
+return `<h1>${m}月${d}日(${w})</h1>${btn('＋ この日に入力する','nd','','p')}${t.map(x=>btn(`<span class="row"><span>${C[x.c]}${x.m?`<br><small class="mu">${esc(x.m)}</small>`:''}</span><span>${fmt(x.a)}</span></span>`,'det',x.id)).join('')||'<p class="c">この日の入力はありません</p>'}<p class="mu">入力を押すと、直す・消すができます。</p>${btn('カレンダーにもどる','go','list')}`},
+det(){const x=S.tx.find(t=>t.id==V.dt);if(!x)return P.list();
+return `<h1>${C[x.c]}</h1><div class="big">${fmt(x.a)}</div><p class="c">${+x.d.slice(5,7)}月${+x.d.slice(8)}日${x.m?'<br>メモ:'+esc(x.m):''}</p>${btn('直す','edit','','p')}${btn('消す','go','del','d')}${back('dy')}`},
+del(){return `<h1>この入力を消しますか?</h1><p>消すと元に戻せません。</p>${btn('消す','delok','','d')}${btn('やめる','go','det')}`},
+hist(){const cm=mk(new Date()),ms=[...new Set([cm,...S.tx.map(x=>x.d.slice(0,7))])].sort().reverse();
+return `<h1>毎月のようす</h1>${ms.map(m=>{const c=calc(m);return btn(`${ym(m)}${m==cm?'(今月)':''}<br><small>${c.rem>=0?(m==cm?'あと ':'余り ')+fmt(c.rem):'超過 '+fmt(-c.rem)}</small>`,'hd',m,c.rem<0?'d':'')}).join('')}
+<div class="card row"><span>特別な出費の累計</span><b>${fmt(sx())}</b></div><p class="mu">余りや超過は、次の月に持ち越しません。</p>${back()}`},
+hd(){const c=calc(V.hm);return `<h1>${ym(V.hm)}のようす</h1><div class="card"><div class="row"><span>使えたお金</span><b>${fmt(c.fr)}</b></div><div class="row"><span>使った額</span><b>${fmt(c.sp)}</b></div><div class="row"><span>${c.rem>=0?'余り':'超過'}</span><b>${fmt(Math.abs(c.rem))}</b></div><div class="row"><span>特別な出費</span><b>${fmt(c.sx)}</b></div></div><h1>使ったお金の内訳</h1>${pie2(c)}${btn('入力一覧を見る','lst2','','p')}${back('hist')}`},
+set(){return `<h1>設定</h1>${btn('収入を直す','go','si')}${btn('毎月の支払いを直す','go','sf')}${btn('貯金の目標を直す','gss')}<hr>${btn('バックアップ','go','bk')}${btn('復元','go','rs')}${back()}`},
+si(){return `<h1>収入</h1>${S.inc.map((i,k)=>btn(`<span class="row"><span>${esc(i.n)}</span><span>${fmt(i.a)}</span></span>`,'ie',k)).join('')}${btn('＋ 収入を足す','ie','new','p')}${back('set')}`},
+iedit(){return `<h1>収入</h1><input data-i="nm" placeholder="名前(例:年金)" value="${esc(V.nm)}"><p class="mu">手取りの金額</p>${disp()}${kp()}${btn('保存する','isave','','p')}${V.ii!=='new'?btn('この収入を消す','idel','','d'):''}${back('si')}`},
+ss(){return `<h1>毎月の貯金の目標</h1><p class="mu">0円でもかまいません</p>${disp()}${kp()}${btn('保存する','svs','','p')}${back('set')}`},
+sf(){const cm=mk(new Date()),row=f=>btn(`<span class="row"><span>${esc(f.n)}${f.y?'<br><small class="mu">年に1回</small>':''}</span><span>${fmt(f.ov&&f.ov[cm]!=null?f.ov[cm]:f.a)}${f.ov&&f.ov[cm]!=null?'<br><small class="mu">今月だけ</small>':''}</span></span>`,'fe',f.id);
+return `<h1>毎月の支払い</h1><p><b>毎月同じ</b></p>${S.fix.filter(f=>!f.v).map(row).join('')||'<p class="mu">なし</p>'}<p><b>月によって変わる</b></p>${S.fix.filter(f=>f.v).map(row).join('')||'<p class="mu">なし</p>'}${btn('＋ 支払いを足す','fe','new','p')}${back('set')}`},
+fe(){const ex=V.fi!=='new',f=ex&&S.fix.find(x=>x.id==V.fi),ts=[['f','毎月同じ'],['v','月によって変わる'],['y','年に1回払う']];
+return `<h1>${ex?esc(f.n):'支払いを足す'}</h1><input data-i="nm" placeholder="名前(例:家賃)" value="${esc(V.nm)}" style="margin-bottom:8px"><div class="g3" style="grid-template-columns:1fr">${ts.map(t=>btn(t[1],'kd',t[0],V.kind==t[0]?'sel':'')).join('')}</div>
+<p class="mu">${V.kind=='y'?'1年分の金額(毎月に分けて計算します)':'金額'}</p>${disp()}${kp()}
+${ex&&V.kind=='v'?`<p class="mu">変えるのは?</p><div class="g2">${btn('今月だけ','sc','m',V.scope=='m'?'sel':'')}${btn('ずっと','sc','a',V.scope=='a'?'sel':'')}</div>`:''}
+${btn('保存する','fgo','','p')}${ex?btn('この支払いを消す','fdel','','d'):''}${back('sf')}`},
+fc(){return `<h1>保存しますか?</h1><p>今月の使えるお金が変わります。</p>${btn('保存する','fok','','p')}${btn('やめる','go','sf')}`},
+bk(){const t=btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+return `<h1>バックアップ</h1><p>今のデータを文字にして、家族に送っておく機能です。</p>${btn('コピーする','cpy','','p')}${btn('LINEで家族に送る','line')}${V.msg?`<p class="c"><b>${V.msg}</b></p>`:''}<p style="color:var(--er);font-weight:700">ご家族以外には送らないでください。</p><textarea id="bt" readonly rows="4">${t}</textarea>${back('set')}`},
+rs(){return `<h1>復元</h1><p>家族から届いたバックアップの文字を、ここに貼り付けます。</p><textarea data-i="rd" rows="5" placeholder="ここに貼り付け">${esc(V.rd||'')}</textarea>${V.msg?`<p style="color:var(--er)"><b>${V.msg}</b></p>`:''}${btn('次へ','rchk','','p')}${back('set')}`},
+rc(){return `<h1>置き換えますか?</h1><p>今のデータは消えて、貼り付けたデータに置き換わります。</p>${btn('置き換える','rok','','d')}${btn('やめる','go','set')}`},
+setup(){const st=S.step||0,sb=st>0?btn('もどる','sb'):'',h=(n,t)=>`<p class="mu">ステップ ${n}/6</p><h1>${t}</h1>`;
+if(st==0)return h(1,'毎月の収入は?')+`<input data-i="nm" placeholder="名前(例:年金)" value="${esc(V.nm)}"><p class="mu">手取りの金額</p>${disp()}${kp()}${btn('次へ','inx','','p')}`;
+if(st==1)return h(2,'ほかにも収入はありますか?')+btn('ある','inmore')+btn('ない','noinc','','p')+sb;
+if(st==2)return h(3,'毎月の支払いを選んでください')+`<p class="mu">いくつでも選べます</p><div class="g2">${FX.map(n=>btn(n,'sel',n,S.sel.includes(n)?'sel':'')).join('')}</div>${btn('次へ','selx','','p')}${sb}`;
+if(st==3){const n=S.sel[S.fix.length],v=VAR.includes(n),y=V.y===undefined?YR.includes(n):V.y;
+return h(4,`${esc(n)}の金額`)+(v?'<p class="mu">毎月変わるお金は、だいたいの金額で大丈夫です</p>':`<div class="g2">${btn('毎月払う','yy','0',y?'':'sel')}${btn('年に1回払う','yy','1',y?'sel':'')}</div><p class="mu">${y?'1年分の金額':'1か月の金額'}</p>`)+disp()+kp()+btn('次へ','fnx','','p')+sb}
+if(st==4)return h(5,'毎月の貯金の目標は?')+`<p class="mu">0円でもかまいません</p>${disp()}${kp()}${btn('次へ','svx','','p')}${sb}`;
+return h(6,'これで良いですか?')+`<div class="card">${S.inc.map(i=>`<div class="row"><span>${esc(i.n)}</span><b>${fmt(i.a)}</b></div>`).join('')}<hr style="margin:8px 0">${S.fix.map(f=>`<div class="row"><span>${esc(f.n)}</span><b>${fmt(f.a)}${f.y?'/年':''}</b></div>`).join('')}<hr style="margin:8px 0"><div class="row"><span>貯金</span><b>${fmt(S.save)}</b></div></div><p class="mu">あとから設定で直せます</p>${btn('はじめる','fin2','','p')}${sb}`}
+};
+const R=()=>{document.getElementById('app').innerHTML=P[V.r]()};
+const go=r=>{V.r=r;V.msg='';R();window.scrollTo(0,0)};
+const to=s=>{S.step=s;save();R();window.scrollTo(0,0)};
+function undoTimer(){setTimeout(()=>{if(V.r=='home'||V.r=='done')R()},8100)}
+async function cp(t){try{await navigator.clipboard.writeText(t);return 1}catch(e){const a=document.getElementById('bt');if(a){a.select();try{return document.execCommand('copy')}catch(e2){}}}return 0}
+function A(a,v){const cm=mk(new Date());
+switch(a){
+case 'go':return go(v);
+case 'new':V.edit=null;V.buf='';V.memo='';V.day=0;V.cat=-1;V.dd=null;return go('cat');
+case 'dy':V.dd=v;V.m=v.slice(0,7);return go('dy');
+case 'nd':V.edit=null;V.buf='';V.memo='';V.cat=-1;return go('cat');
+case 'pc':V.cat=+v;return go('amt');
+case 'day':V.day=V.day?0:1;return R();
+case 'k':V.buf=v=='消す'?V.buf.slice(0,-1):(V.buf+v).replace(/^0+/,'').slice(0,7);return R();
+case 'q':V.buf=String(v);return R();
+case 'add':{const n=+V.buf;if(!n)return;
+if(V.edit){const x=S.tx.find(t=>t.id==V.edit);x.c=V.cat;x.a=n;x.m=V.memo;V.dt=x.id;V.edit=null;save();return go('det')}
+const id=Date.now();S.tx.push({id,c:V.cat,a:n,d:V.dd||ds(new Date(Date.now()-V.day*864e5)),m:V.memo});V.last=id;V.undo={id,t:Date.now()+8000};save();undoTimer();return go('done')}
+case 'undo':S.tx=S.tx.filter(t=>t.id!=V.undo.id);V.undo=null;save();return go(V.dd?'dy':'home');
+case 'more':V.buf='';V.memo='';V.cat=-1;return go('cat');
+case 'fin':V.day=0;return go(V.dd?'dy':'home');
+case 'lst':V.m=cm;return go('list');
+case 'lst2':V.m=V.hm;return go('list');
+case 'mo':{const y=+V.m.slice(0,4),m=+V.m.slice(5);V.m=mk(new Date(y,m-1+(+v),1));return R()}
+case 'det':V.dt=+v;return go('det');
+case 'edit':{const x=S.tx.find(t=>t.id==V.dt);V.edit=x.id;V.cat=x.c;V.buf=String(x.a);V.memo=x.m||'';return go('cat')}
+case 'delok':S.tx=S.tx.filter(t=>t.id!=V.dt);save();return go('dy');
+case 'hd':V.hm=v;return go('hd');
+case 'ie':V.ii=v=='new'?'new':+v;V.nm=v=='new'?'':S.inc[+v].n;V.buf=v=='new'?'':String(S.inc[+v].a);return go('iedit');
+case 'isave':{const o={n:V.nm.trim()||'収入',a:+V.buf||0};if(V.ii=='new')S.inc.push(o);else S.inc[V.ii]=o;save();return go('si')}
+case 'idel':if(confirm('この収入を消しますか?')){S.inc.splice(V.ii,1);save();go('si')}return;
+case 'gss':V.buf=S.save?String(S.save):'';return go('ss');
+case 'svs':S.save=+V.buf||0;save();return go('set');
+case 'fe':{V.fi=v=='new'?'new':+v;const f=v=='new'?null:S.fix.find(x=>x.id==+v);V.nm=f?f.n:'';V.buf=f?String(f.a):'';V.kind=f?(f.v?'v':f.y?'y':'f'):'f';V.scope=f&&f.v?'m':'a';return go('fe')}
+case 'kd':V.kind=v;if(v!='v')V.scope='a';return R();
+case 'sc':V.scope=v;return R();
+case 'fgo':if(!+V.buf)return;return go('fc');
+case 'fok':{const a=+V.buf,n=V.nm.trim()||'支払い';
+if(V.fi=='new')S.fix.push({id:Date.now(),n,a,v:V.kind=='v',y:V.kind=='y'});
+else{const f=S.fix.find(x=>x.id==V.fi);f.n=n;if(f.v&&V.kind=='v'&&V.scope=='m'){f.ov=f.ov||{};f.ov[cm]=a}else{f.a=a;f.v=V.kind=='v';f.y=V.kind=='y';if(f.ov)delete f.ov[cm]}}
+save();return go('sf')}
+case 'fdel':if(confirm('この支払いを消しますか?')){S.fix=S.fix.filter(x=>x.id!=V.fi);save();go('sf')}return;
+case 'cpy':cp(document.getElementById('bt').value).then(ok=>{if(ok){S.bk=Date.now();save()}V.msg=ok?'コピーしました':'コピーできませんでした';R()});return;
+case 'line':S.bk=Date.now();save();window.open('https://line.me/R/msg/text/?'+encodeURIComponent(document.getElementById('bt').value),'_blank');return;
+case 'rchk':try{const d=JSON.parse(decodeURIComponent(escape(atob((V.rd||'').trim()))));if(!Array.isArray(d.tx)||!Array.isArray(d.inc)||!Array.isArray(d.fix))throw 0;V.nd=d;return go('rc')}catch(e){V.msg='読み取れません。文字をすべて貼り付けてください。';return R()}
+case 'rok':S=V.nd;S.ok=1;save();V.rd='';return go('home');
+case 'inx':{if(!+V.buf)return;S.inc.push({n:V.nm.trim()||'収入',a:+V.buf});V.nm='';V.buf='';return to(1)}
+case 'inmore':return to(0);
+case 'noinc':return to(2);
+case 'sel':S.sel=S.sel.includes(v)?S.sel.filter(x=>x!=v):[...S.sel,v];save();return R();
+case 'selx':S.fix=[];V.buf='';V.y=undefined;return to(S.sel.length?3:4);
+case 'yy':V.y=v=='1';return R();
+case 'fnx':{if(!+V.buf)return;const n=S.sel[S.fix.length],y=V.y===undefined?YR.includes(n):V.y;S.fix.push({id:Date.now()+S.fix.length,n,a:+V.buf,v:VAR.includes(n),y:!VAR.includes(n)&&y});V.buf='';V.y=undefined;return to(S.fix.length>=S.sel.length?4:3)}
+case 'svx':S.save=+V.buf||0;V.buf='';return to(5);
+case 'sb':{const st=S.step||0;V.y=undefined;
+if(st==1){const i=S.inc.pop();V.nm=i?i.n:'';V.buf=i?String(i.a):'';return to(0)}
+if(st==3){if(S.fix.length){const f=S.fix.pop();V.buf=String(f.a);return to(3)}return to(2)}
+if(st==4){V.buf='';if(S.sel.length){const f=S.fix.pop();V.buf=f?String(f.a):'';return to(3)}return to(2)}
+if(st==5){V.buf=String(S.save||'');return to(4)}
+return to(st-1)}
+case 'fin2':S.ok=1;S.step=0;save();return go('home');
+}}
+document.getElementById('app').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A(b.dataset.a,b.dataset.v)});
+document.getElementById('app').addEventListener('input',e=>{const i=e.target.dataset.i;if(i)V[i]=e.target.value});
+R();
+</script></body></html>
